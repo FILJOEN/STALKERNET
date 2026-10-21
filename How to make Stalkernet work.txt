@@ -1,0 +1,158 @@
+==============================================================
+  STALKERNET  -  PDA chat monitor overlay for S.T.A.L.K.E.R. 2
+==============================================================
+
+StalkerNet shows a little digital monitor that slides down on your screen
+with stalker chat messages, conversations, GIF transmissions and radio
+glitches. It runs NEXT TO the game (it is not installed into the game
+folder), so it does not change any game files.
+
+You do NOT need to install Python. Just unzip and set one Steam option.
+
+
+--------------------------------------------------------------
+  INSTALL (3 steps)
+--------------------------------------------------------------
+
+1. UNZIP the StalkerNet folder anywhere you like.
+
+   Good places (short path, no admin rights needed):
+       C:\Games\StalkerNet
+       D:\Mods\StalkerNet
+       C:\Users\YourName\Documents\StalkerNet
+
+   Do NOT put it in "Program Files" and do NOT put it inside the
+   Stalker 2 game folder. The program must be allowed to write its
+   own small files next to itself.
+
+   The folder must contain StalkerNet.exe next to the folders
+   messages, images, vids, sounds, fonts and the file settings.txt.
+
+2. OPEN STEAM -> Library -> right-click S.T.A.L.K.E.R. 2 -> Properties
+   -> General -> LAUNCH OPTIONS, and paste this line (change the path
+   to where YOU put the folder):
+
+       "C:\Games\StalkerNet\launch_stalkernet.bat" %command%
+
+   More examples:
+
+       "D:\Mods\StalkerNet\launch_stalkernet.bat" %command%
+       "C:\Users\YourName\Documents\StalkerNet\launch_stalkernet.bat" %command%
+
+   Keep the quotation marks and keep the word  %command%  exactly as
+   written. If you already have other launch options, put them AFTER
+   %command%, for example:
+
+       "C:\Games\StalkerNet\launch_stalkernet.bat" %command% -dx12
+
+   Tip: hold Shift and right-click launch_stalkernet.bat, choose
+   "Copy as path", and paste that into Steam, then add  %command%
+
+3. SET THE GAME TO "BORDERLESS WINDOWED" (or Windowed) in the game's
+   video settings. An overlay cannot be drawn over exclusive fullscreen.
+
+Now start the game from Steam as usual. The overlay starts with the
+game and closes by itself when the game (or Steam) is closed.
+
+
+--------------------------------------------------------------
+  GAME NOT STARTED THROUGH STEAM (other folder, GOG, Epic, etc.)
+--------------------------------------------------------------
+
+It does not matter where the game is installed: StalkerNet never needs
+the game folder. With Steam the launch option above is all you need,
+whatever drive or folder the game is on.
+
+If you start the game some other way (no Steam), do this instead:
+
+1. Open settings.txt and set:
+       QUIT_WHEN_STEAM_CLOSES = false
+   (otherwise the overlay thinks "no Steam" and closes after a few seconds)
+2. Open launch_stalkernet_no_steam.bat with Notepad and change the
+   GAME_PATH line to the full path of your game's .exe, for example:
+       C:\Games\Stalker2\Stalker2\Binaries\Win64\Stalker2-Win64-Shipping.exe
+3. Start the game by double-clicking launch_stalkernet_no_steam.bat
+   (or make a desktop shortcut to it).
+
+Or simply start  StalkerNet.exe  by hand shortly before the game. With
+no extra options it just stays on until you run close_stalkernet.bat.
+
+If the overlay does not close with your game, the game's process has a
+different name. Start the game, open Task Manager -> Details, find the
+name of the game's .exe, and put it in settings.txt:
+       GAME_EXE = TheNameYouSaw.exe
+
+
+--------------------------------------------------------------
+  HOW TO USE
+--------------------------------------------------------------
+
+   +  (numpad plus or keyboard plus)   monitor slides DOWN
+   -  (numpad minus or keyboard minus) monitor slides back UP
+
+- Messages keep arriving while the monitor is away (you still hear
+  the ping), so open it when you hear one.
+- In menus, the inventory and the map the monitor puts itself away and
+  comes back when you return to the game.
+
+
+--------------------------------------------------------------
+  CHANGE THE SETTINGS
+--------------------------------------------------------------
+
+Open  settings.txt  with Notepad. Every setting has a short description.
+You can change how often messages come, colours, glow, sizes, positions,
+the glitch, the GIFs, the sound volumes, the keys and much more.
+Change a value, save the file, then restart the game (or the overlay).
+To go back to the defaults, delete settings.txt.
+
+Your own messages and conversations:
+   messages\messages.txt  - the single messages
+
+
+--------------------------------------------------------------
+  UNINSTALL
+--------------------------------------------------------------
+
+1. Steam -> Properties -> Launch Options: delete the line.
+2. Delete the StalkerNet folder.
+Nothing else was changed on your PC.
+
+
+--------------------------------------------------------------
+  PROBLEMS?
+--------------------------------------------------------------
+
+* Nothing appears:
+    - Is the game on Borderless Windowed / Windowed?
+    - Is the Steam launch option exactly as shown above, with the
+      correct path to YOUR folder?
+    - Try running launch_stalkernet.bat by double-clicking it. The
+      monitor should start (press + to bring it down).
+
+* Windows or your antivirus warns about StalkerNet.exe:
+    It is a small program made with Python (PyInstaller). Some antivirus
+    programs wrongly warn about those. If you do not trust it, ask the
+    author for the Python version of the files.
+
+* It does not close, or you want to stop it:
+    double-click  close_stalkernet.bat
+
+* Still stuck?
+    Open overlay_debug.txt in the folder, it lists what the program did
+    and any problem found in settings.txt. Please include it when you
+    ask for help.
+
+* No sound / no glitch sound:
+    Check that the sounds folder contains ping.mp3 (or ping.wav) and
+    glitch.mp3, and check the volume lines in settings.txt.
+
+
+--------------------------------------------------------------
+  CREDITS
+--------------------------------------------------------------
+
+Made by: <your name>
+S.T.A.L.K.E.R. 2: Heart of Chornobyl is the property of GSC Game World.
+This is an unofficial fan project and is not affiliated with GSC Game World.
+(Add credits for pictures, fonts and sounds you did not make here.)
