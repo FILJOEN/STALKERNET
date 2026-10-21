@@ -6,3 +6,5 @@ It does not read or modify any game data or files. It's purely a cosmetic overla
 Claude created the build_exe.bat for me to run next to stalkernet.py and it created the Stalkernet.exe and a launch_stalker2_with_overlay.bat to run the exe/script when Stalker 2 is run from Steam, it will also stop the script when Stalker is closed.
 Source code for the STALKERNET cosmetic PDA-style overlay for S.T.A.L.K.E.R. 2 can be found in the repositories.  
 Folder too big to be uploaded to Github.
+Folder consists of multiple folders containing mp3/png/gif/txt/font files.
+https://www.nexusmods.com/stalker2heartofchornobyl/mods/3051?tab=files
