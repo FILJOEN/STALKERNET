@@ -42,6 +42,18 @@ import traceback
 from collections import deque
 from pathlib import Path
 
+# Steam can start StalkerNet.exe directly:   "C:\...\StalkerNet.exe" %command%
+# Then everything after the exe is the game's own command line. We start the game ourselves (no .bat, so no
+# black cmd window) and run in "linked to the game" mode.
+_GAME_CMD = []
+_args = sys.argv[1:]
+while _args and _args[0] == "--with-game":
+    _args = _args[1:]
+if _args:
+    _GAME_CMD = list(_args)
+    sys.argv = [sys.argv[0], "--with-game"]
+_GAME_CWD = os.getcwd()
+
 from PyQt5 import QtWidgets, QtGui, QtCore
 
 try:
@@ -101,6 +113,17 @@ BLOOD_AUTO = False                       # used when there is neither: pick the 
 BLOOD_MIN_RED = 90                       # auto mode: a pixel counts as blood if red >= this ...
 BLOOD_RED_OVER = 45                      # ... and red is at least this much higher than green and blue
 DISPLAY_SCALE = 1.0
+# DISPLAY_SCALE above makes the WHOLE overlay bigger/smaller: the monitor, the text, the pictures, the GIFs and
+# every position scale together (1.0 = normal, 0.8 = 20% smaller, 1.2 = 20% bigger).
+# AUTOMATIC SIZE FOR YOUR SCREEN: everything in this file was made for a 3840 x 2160 (4K) screen.
+# "auto" shrinks/enlarges every size and position to fit your screen (and ignores Windows display scaling).
+# Or type a number to force it: 1.0 = the 4K look, 0.5 = half size, 0.667 = for 1440p.
+UI_SCALE = "auto"
+# Text sizes (font=13, name=30 ...) were tuned with Windows display scaling at 150%, which made text 1.5x
+# bigger than at 100%. This keeps that look on every PC. Make it larger/smaller to resize ALL text at once.
+FONT_SIZE_FACTOR = 1.5
+UI_K = 1.0                               # the factor that is really used (set at start-up, do not edit)
+REF_SCREEN_W, REF_SCREEN_H = 3840, 2160
 DISPLAY_DX_CM, DISPLAY_DY_CM = -74, -2   # where the display sits when it is DOWN
 
 # ---------------- random GIF transmissions ----------------
@@ -246,6 +269,12 @@ NO_SOUND_FIRST_MS = 5 * 60 * 1000    # no ping for this long after the game star
                                      #  otherwise from launching the script)
 TYPEWRITER_ON_REPLACE = False        # False = a replacing message swaps in instantly (no typewriter)
 
+# How the FIRST message of a conversation moves while the monitor slides down to wait for the reply:
+#   still = it stays put on the screen (the monitor slides down behind it)
+#   float = it lifts up a little while the monitor goes down, then settles into place
+#   ride  = it goes down with the monitor a little, then slides up into place
+CONVO_FIRST_MOTION = "still"
+CONVO_FIRST_MOTION_CM = 1.5              # how far it lifts (float) or dips (ride), in cm
 CONVERSATION_REPLY_DELAY_MS = 7000   # after a message finishes typing, wait this long for the reply
 DOTS_START_DELAY_MS = 3000           # typing dots appear this long after the previous message was written
 DOTS_INTERVAL_MS = 400               # speed of the dots animation
@@ -884,7 +913,7 @@ _font_cache = {}
 
 
 def safe_load_font(path, size, fallback="Segoe UI"):
-    key = (str(path), size)
+    key = (str(path), size, UI_K)
     if key in _font_cache:
         return _font_cache[key]
 
@@ -900,7 +929,7 @@ def safe_load_font(path, size, fallback="Segoe UI"):
 
     font = QtGui.QFont(family)
     if size > 0:                       # a size <= 0 (like -200) keeps the default size
-        font.setPointSize(size)
+        font.setPixelSize(max(1, int(round(size * 96 / 72 * FONT_SIZE_FACTOR * UI_K))))   # pixels, so Windows scaling can't change it
     _font_cache[key] = font
     return font
 
@@ -1199,7 +1228,7 @@ class SingleMessage(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(MSG_PAD, MSG_PAD, MSG_PAD, MSG_PAD)
-        self.main_layout.setSpacing(12)
+        self.main_layout.setSpacing(max(1, int(12 * UI_K)))
 
         # avatar
         self.img_label = QtWidgets.QLabel()
@@ -1215,18 +1244,18 @@ class SingleMessage(QtWidgets.QWidget):
         self.avatar_label.hide()
         key = next((k for k, v in PROFILES.items() if v is profile), None)
         mx, my = AVATAR_MOVE_MM.get(key, (0.0, 0.0))
-        self._avatar_dx = int((mx + profile.get("avatar_dx_mm", 0)) * 96 / 25.4)
-        self._avatar_dy = int((my + profile.get("avatar_dy_mm", 0)) * 96 / 25.4)
+        self._avatar_dx = int((mx + profile.get("avatar_dx_mm", 0)) * 96 * UI_K / 25.4)
+        self._avatar_dy = int((my + profile.get("avatar_dy_mm", 0)) * 96 * UI_K / 25.4)
         tx, ty = TEXT_MOVE_MM.get(key, (0.0, 0.0))
         # the whole window is shifted by the text offset; the portrait is placed backwards by the
         # same amount, so on screen only the text has moved
-        self._text_shift = QtCore.QPoint(int(tx * 96 / 25.4), int(ty * 96 / 25.4))
+        self._text_shift = QtCore.QPoint(int(tx * 96 * UI_K / 25.4), int(ty * 96 * UI_K / 25.4))
         self._content_h = 0
 
         # text area
         self.text_layout = QtWidgets.QVBoxLayout()
         self.text_layout.setContentsMargins(0, 0, 0, 0)
-        self.text_layout.setSpacing(8)
+        self.text_layout.setSpacing(max(1, int(8 * UI_K)))
         self.main_layout.addLayout(self.text_layout, 1)
 
         self.name_row = QtWidgets.QHBoxLayout()
@@ -1378,8 +1407,11 @@ class SingleMessage(QtWidgets.QWidget):
         if pix_path:
             pix = QtGui.QPixmap(pix_path)
             if not pix.isNull():
-                if pix.height() > max_h or (AVATAR_SCALE_UP and pix.height() < max_h):
-                    pix = pix.scaledToHeight(max_h, QtCore.Qt.SmoothTransformation)
+                # AVATAR_SCALE_UP true: always exactly the profile height. false: a small picture keeps its own
+                # size (never enlarged beyond it) but is scaled with everything else by DISPLAY_SCALE / the screen fit
+                target_h = max_h if AVATAR_SCALE_UP else min(max_h, max(1, int(round(pix.height() * UI_K))))
+                if pix.height() != target_h:
+                    pix = pix.scaledToHeight(target_h, QtCore.Qt.SmoothTransformation)
                 self.avatar_label.setPixmap(pix)          # slot width stays fixed (see TEXT_MOVE_MM note)
 
         # measure the finished message so the window height is stable while typing
@@ -1459,8 +1491,8 @@ class SingleMessage(QtWidgets.QWidget):
         """Absolute position: from the top of the message text + its own mm offset (independent of the message length)."""
         self.main_layout.activate()
         ml = self.msg_label
-        dx = int(GIF_UPLOAD_MOVE_MM[0] * 96 / 25.4)
-        dy = int(GIF_UPLOAD_MOVE_MM[1] * 96 / 25.4)
+        dx = int(GIF_UPLOAD_MOVE_MM[0] * 96 * UI_K / 25.4)
+        dy = int(GIF_UPLOAD_MOVE_MM[1] * 96 * UI_K / 25.4)
         self.upload_label.move(ml.x() + dx, ml.y() + dy)
 
     def show_typing(self, name, faction, image_path):
@@ -1836,7 +1868,7 @@ class UsersLabel(QtWidgets.QWidget):
         self.label = QtWidgets.QLabel(self)
         self.label.setFont(safe_load_font(FONTS_DIR / "StalkerMessage.ttf", USERS_FONT_SIZE))
         self.label.setStyleSheet(f"color: {USERS_COLOR}; background: transparent;")
-        self._pad = 20                       # room around the text so the glow is not cut off
+        self._pad = max(8, int(20 * UI_K))                       # room around the text so the glow is not cut off
         self.label.move(self._pad, self._pad)
         if USERS_GLOW_STRENGTH > 0 or USERS_SOFTNESS > 0:
             self.label.setGraphicsEffect(CrtGlowEffect(USERS_GLOW_COLOR or USERS_COLOR, USERS_GLOW_STRENGTH,
@@ -2199,14 +2231,17 @@ class OverlayApp(QtCore.QObject):
 
         # ---------------- positions ----------------
         screen = QtWidgets.QApplication.primaryScreen()
-        self.screen_w = screen.size().width() if screen else 3840
-        self.px_per_cm = 96 / 2.54
+        # the layout is measured for a 4K screen and scaled by UI_K, so use the matching "virtual" width
+        # (the same as the real width on every 16:9 screen) and start at the screen's own top-left corner
+        self.screen_w = int(round(REF_SCREEN_W * UI_K))
+        self.origin = screen.geometry().topLeft() if screen else QtCore.QPoint(0, 0)
+        self.px_per_cm = 96 / 2.54 * UI_K
         self.raise_px = int(MONITOR_RAISE_RANDOM_CM * self.px_per_cm)
         self.monitor_mode = "random"        # "random" = raised monitor, "convo" = full-down monitor
         self._mode_cb = None
 
         self.down_pos = self._pos_for(DISPLAY_DX_CM, DISPLAY_DY_CM)
-        self.up_pos = QtCore.QPoint(self.down_pos.x(), -self.display.height())
+        self.up_pos = QtCore.QPoint(self.down_pos.x(), self.origin.y() - self.display.height())
         self.display.move(self.up_pos)
 
         for w in self.widgets:
@@ -2232,6 +2267,7 @@ class OverlayApp(QtCore.QObject):
             self.users_timer.timeout.connect(self._users_tick)
             self.users_timer.start(USERS_UPDATE_MS)
 
+        self._pinned = None                 # conversation top message that stays put while the monitor lowers
         self.convo_top_pos = self._pos_for(PROFILES["convo_top"]["dx_cm"],
                                            PROFILES["convo_top"]["dy_cm"])
         self.convo_bottom_pos = self._pos_for(PROFILES["convo_bottom"]["dx_cm"],
@@ -2504,8 +2540,8 @@ class OverlayApp(QtCore.QObject):
     # ========================================================
 
     def _pos_for(self, dx_cm, dy_cm):
-        x = self.screen_w - PANEL_MARGIN_X - PANEL_WIDTH + int(dx_cm * self.px_per_cm)
-        y = PANEL_MARGIN_Y + int(dy_cm * self.px_per_cm)
+        x = self.origin.x() + self.screen_w - PANEL_MARGIN_X - PANEL_WIDTH + int(dx_cm * self.px_per_cm)
+        y = self.origin.y() + PANEL_MARGIN_Y + int(dy_cm * self.px_per_cm)
         return QtCore.QPoint(x, y)
 
     # ========================================================
@@ -2556,8 +2592,34 @@ class OverlayApp(QtCore.QObject):
 
     def _apply_offset(self, pos):
         off = QtCore.QPoint(pos) - self.down_pos
+        self._update_pinned(off)
         for w in self.riders:
             w.set_offset(off)
+
+    def _update_pinned(self, off):
+        """The first conversation message appears at the one-message height. While the monitor lowers to the
+        conversation height it must stay where it is on the screen, so its base position gives back exactly
+        what the monitor moves (only for the last `raise_px` pixels of the way down)."""
+        w = self._pinned
+        if w is None:
+            return
+        R = max(1, self.raise_px)
+        comp = max(0, min(R, -off.y()))
+        mode = str(CONVO_FIRST_MOTION).strip().lower()
+        if mode in ("float", "ride") and -off.y() <= R:
+            import math
+            t = 1.0 - (-off.y()) / float(R)                 # 0 = monitor still raised, 1 = fully down
+            amt = CONVO_FIRST_MOTION_CM * self.px_per_cm * math.sin(math.pi * t)
+            comp = comp + (-amt if mode == "float" else amt)
+        w._base_pos = QtCore.QPoint(self.convo_top_pos.x(), self.convo_top_pos.y() + comp)
+        if off.y() >= 0:                      # monitor is all the way down: back to the normal position
+            self._pinned = None
+
+    def _unpin(self):
+        if self._pinned is not None:
+            self._pinned._base_pos = QtCore.QPoint(self.convo_top_pos)
+            self._pinned._place()
+            self._pinned = None
 
     def slide_down(self):
         if self.display_down:
@@ -2951,8 +3013,28 @@ class OverlayApp(QtCore.QObject):
             if rw is not self.random_widget:
                 rw._abort_away()
         # clear the random message first so nothing overlaps
-        self.random_widget.clear_out(on_done=self._enter_convo_mode,
+        self._unpin()
+        self.random_widget.clear_out(on_done=self._begin_conversation_raised,
                                      instant=self._instant() or not TYPEWRITER_ON_REPLACE)
+
+    def _begin_conversation_raised(self):
+        """The first message shows at the one-message height; the monitor lowers when it is written."""
+        self.set_monitor_mode("random", then=self._first_conversation_message)
+
+    def _first_conversation_message(self):
+        if not self.conversation_active:
+            return
+        self._pinned = self.convo_top
+        self._update_pinned(self.display.pos() - self.down_pos)
+        self.convo_top._place()
+        self._conversation_next()
+
+    def _lower_for_conversation(self, then=None):
+        """The monitor slides down to the conversation height (the reply is about to start), then `then()`."""
+        at_raised = self.display_down and self.display.pos() == self.target_pos()
+        if not at_raised:                     # monitor is away / moving: the message just rides with it
+            self._unpin()
+        self.set_monitor_mode("convo", then=then)
 
     def _conversation_next(self):
         if not self.conversation_active:
@@ -2962,6 +3044,11 @@ class OverlayApp(QtCore.QObject):
         index = self.current_conversation_index
         if convo is None or index >= len(convo):
             self._conversation_finish()
+            return
+
+        if index == 1 and self.monitor_mode == "random":
+            # no typing dots were shown (or they were skipped): lower the monitor before the reply appears
+            self._lower_for_conversation(then=self._conversation_next)
             return
 
         name, faction, text = convo[index]
@@ -3055,6 +3142,11 @@ class OverlayApp(QtCore.QObject):
         if convo is None or i < 1 or i >= len(convo):
             return
 
+        if i == 1 and self.monitor_mode == "random":
+            # the reply is coming: only NOW does the monitor slide down; the dots show once it is down
+            self._lower_for_conversation(then=lambda: self._conv_dots_start(token))
+            return
+
         name, faction, _text = convo[i]
         img = get_character_image(name, faction)
 
@@ -3119,6 +3211,7 @@ class OverlayApp(QtCore.QObject):
         self.conversation_active = False
         self.current_conversation = None
         self.current_conversation_index = 0
+        self._unpin()
         self.set_monitor_mode("random")     # monitor goes back up to the one-message height
         QtCore.QTimer.singleShot(POST_CONVERSATION_DELAY_MS, self._show_post_conversation_random)
 
@@ -3143,7 +3236,96 @@ class OverlayApp(QtCore.QObject):
 # MAIN
 # ============================================================
 
-def replace_old_instance():
+def compute_ui_scale(screen):
+    """UI_SCALE = number -> that number; "auto" -> fit the screen (the layout was made for 3840 x 2160)."""
+    raw = str(UI_SCALE).strip().lower()
+    if raw not in ("", "auto"):
+        try:
+            return max(0.1, min(4.0, float(raw)))
+        except ValueError:
+            debug(f"UI_SCALE '{UI_SCALE}' is not a number or 'auto' - using auto")
+    if screen is None:
+        return 1.0
+    size = screen.size()
+    k = min(size.width() / float(REF_SCREEN_W), size.height() / float(REF_SCREEN_H))
+    return max(0.2, min(3.0, k))
+
+
+def apply_ui_scale(k):
+    """Multiply every pixel size by k (positions in cm/mm and fonts use UI_K directly)."""
+    global UI_K, DISPLAY_SCALE, PANEL_MARGIN_X, PANEL_MARGIN_Y, PANEL_WIDTH, MSG_PAD
+    global GIF_AREA_HEIGHT, GIF_BOX_W, GIF_BOX_H, GIF_BLUR_RADIUS
+    global GLITCH_GIF_UP_W, GLITCH_GIF_UP_H, GLITCH_JITTER_PX, GLITCH_GHOST_PX
+    global TEXT_BLUR_RADIUS, TEXT_GLOW_RADIUS, GIF_UPLOAD_GLOW_RADIUS, USERS_GLOW_RADIUS
+    k = k * DISPLAY_SCALE                  # DISPLAY_SCALE = your own extra size for EVERYTHING (monitor, text, pictures...)
+    if abs(k - 1.0) < 0.01:
+        k = 1.0
+    UI_K = k
+    DISPLAY_SCALE = k                      # the monitor image gets the very same factor as the text
+    if k == 1.0:
+        return
+    r = lambda v: max(1, int(round(v * k)))
+    PANEL_MARGIN_X, PANEL_MARGIN_Y, PANEL_WIDTH = r(PANEL_MARGIN_X), r(PANEL_MARGIN_Y), r(PANEL_WIDTH)
+    MSG_PAD = r(MSG_PAD)
+    GIF_AREA_HEIGHT, GIF_BOX_W, GIF_BOX_H = r(GIF_AREA_HEIGHT), r(GIF_BOX_W), r(GIF_BOX_H)
+    GIF_BLUR_RADIUS = GIF_BLUR_RADIUS * k
+    GLITCH_GIF_UP_W, GLITCH_GIF_UP_H = r(GLITCH_GIF_UP_W), r(GLITCH_GIF_UP_H)
+    GLITCH_JITTER_PX, GLITCH_GHOST_PX = r(GLITCH_JITTER_PX), r(GLITCH_GHOST_PX)
+    TEXT_BLUR_RADIUS = TEXT_BLUR_RADIUS * k
+    TEXT_GLOW_RADIUS, GIF_UPLOAD_GLOW_RADIUS, USERS_GLOW_RADIUS = (
+        r(TEXT_GLOW_RADIUS), r(GIF_UPLOAD_GLOW_RADIUS), r(USERS_GLOW_RADIUS))
+    for prof in PROFILES.values():
+        if prof.get("avatar", 0) > 0:
+            prof["avatar"] = r(prof["avatar"])
+
+
+_mutex_handle = None
+
+
+def _try_acquire_instance_lock():
+    """True = we are the only copy. False = another copy already holds the lock."""
+    global _mutex_handle
+    try:
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateMutexW.restype = ctypes.c_void_p
+        k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
+        h = k32.CreateMutexW(None, 0, "Local\\StalkerNetOverlaySingleInstance")
+        if ctypes.get_last_error() == 183:                  # ERROR_ALREADY_EXISTS
+            k32.CloseHandle(h)
+            return False
+        _mutex_handle = h
+        return True
+    except Exception:
+        return True                                   # not Windows / cannot check: just run
+
+
+def _show_message_box(text, title="StalkerNet"):
+    try:
+        ctypes.windll.user32.MessageBoxW(None, text, title, 0x40 | 0x1000)    # info icon, topmost
+    except Exception:
+        print(text)
+
+
+def ensure_single_instance():
+    """Only one overlay at a time. Returns False when this copy should simply quit."""
+    if _try_acquire_instance_lock():
+        return True
+    if "--with-game" in sys.argv:
+        # started by Steam: an older copy (maybe started by hand, without the game link) is replaced
+        replace_old_instance(kill_only=True)
+        for _ in range(20):
+            time.sleep(0.25)
+            if _try_acquire_instance_lock():
+                debug("Replaced the older overlay")
+                return True
+    _show_message_box("StalkerNet is already running.\n\n"
+                      f"Press {HOTKEY_DOWN_NAME} to bring the monitor down and {HOTKEY_UP_NAME} to put it away.\n"
+                      "To close it, run close_stalkernet.bat or end StalkerNet.exe in Task Manager.")
+    return False
+
+
+def replace_old_instance(kill_only=False):
     """Only one overlay at a time. If an older copy of this script is still running (for example the
     invisible one Steam started), close it so the new copy takes over."""
     me = os.getpid()
@@ -3158,13 +3340,16 @@ def replace_old_instance():
             out = subprocess.run(["tasklist", "/FI", f"PID eq {old}", "/NH"],
                                  capture_output=True, text=True, timeout=8,
                                  creationflags=flags).stdout.lower()
-            if "python" in out:                       # only ever close a python process
+            own = os.path.basename(sys.executable).lower()
+            if "python" in out or own in out:         # only ever close one of our own processes
                 subprocess.run(["taskkill", "/PID", str(old), "/F"],
                                capture_output=True, timeout=8, creationflags=flags)
                 debug(f"Closed the older overlay (process {old})")
         except Exception:
             pass
 
+    if kill_only:
+        return
     try:
         PID_FILE.write_text(str(me), encoding="utf-8")
     except Exception:
@@ -3187,9 +3372,27 @@ def main():
         pass
     for _note in _SETTINGS_NOTES:
         debug(_note)
-    replace_old_instance()
+    if _GAME_CMD:
+        try:
+            subprocess.Popen(_GAME_CMD, cwd=_GAME_CWD, close_fds=True)
+            debug(f"Started the game: {_GAME_CMD}")
+        except Exception as e:
+            debug(f"Could not start the game ({_GAME_CMD}): {e}")
+    if not ensure_single_instance():
+        return
+    replace_old_instance()                      # writes our PID so a newer copy can find us
+    # use real screen pixels whatever the Windows display scaling is (we scale everything ourselves)
+    os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "0"
+    os.environ["QT_SCALE_FACTOR"] = "1"
+    try:
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DisableHighDpiScaling, True)
+    except Exception:
+        pass
     app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+    _scr = app.primaryScreen()
+    apply_ui_scale(compute_ui_scale(_scr))
+    debug(f"Screen {_scr.size().width()}x{_scr.size().height()} -> UI scale {UI_K:.3f}" if _scr else "UI scale 1.0")
 
     ctrl = OverlayApp()
 
