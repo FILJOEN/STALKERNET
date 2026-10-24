@@ -26,27 +26,34 @@ You do NOT need to install Python. Just unzip and set one Steam option.
    own small files next to itself.
 
    The folder must contain StalkerNet.exe next to the folders
-   messages, images, vids, sounds, fonts and the file settings.txt.
+   messages, images, vids, sounds, fonts, the file settings.txt and the
+   three launcher files (launch_stalkernet.bat, launch_stalkernet_no_steam.bat,
+   close_stalkernet.bat).
 
 2. OPEN STEAM -> Library -> right-click S.T.A.L.K.E.R. 2 -> Properties
    -> General -> LAUNCH OPTIONS, and paste this line (change the path
    to where YOU put the folder):
 
-       "C:\Games\StalkerNet\launch_stalkernet.bat" %command%
+       "C:\Games\StalkerNet\StalkerNet.exe" %command%
 
    More examples:
 
-       "D:\Mods\StalkerNet\launch_stalkernet.bat" %command%
-       "C:\Users\YourName\Documents\StalkerNet\launch_stalkernet.bat" %command%
+       "D:\Mods\StalkerNet\StalkerNet.exe" %command%
+       "C:\Users\YourName\Documents\StalkerNet\StalkerNet.exe" %command%
 
    Keep the quotation marks and keep the word  %command%  exactly as
    written. If you already have other launch options, put them AFTER
    %command%, for example:
 
-       "C:\Games\StalkerNet\launch_stalkernet.bat" %command% -dx12
+       "C:\Games\StalkerNet\StalkerNet.exe" %command% -dx12
 
-   Tip: hold Shift and right-click launch_stalkernet.bat, choose
+   StalkerNet starts the game for you, so there is no black command
+   window. Tip: hold Shift and right-click StalkerNet.exe, choose
    "Copy as path", and paste that into Steam, then add  %command%
+
+   (Alternative if the line above does not work for you: use
+   "C:\Games\StalkerNet\launch_stalkernet.bat" %command%   instead.
+   This one shows a black command window while you play.)
 
 3. SET THE GAME TO "BORDERLESS WINDOWED" (or Windowed) in the game's
    video settings. An overlay cannot be drawn over exclusive fullscreen.
@@ -127,13 +134,27 @@ Nothing else was changed on your PC.
     - Is the game on Borderless Windowed / Windowed?
     - Is the Steam launch option exactly as shown above, with the
       correct path to YOUR folder?
-    - Try running launch_stalkernet.bat by double-clicking it. The
-      monitor should start (press + to bring it down).
+    - Try double-clicking StalkerNet.exe. The monitor should start
+      (press + to bring it down).
 
 * Windows or your antivirus warns about StalkerNet.exe:
     It is a small program made with Python (PyInstaller). Some antivirus
     programs wrongly warn about those. If you do not trust it, ask the
     author for the Python version of the files.
+
+* Nothing seems to happen when I start StalkerNet.exe:
+    That is normal - the monitor stays hidden until you press + (numpad
+    plus, or the =/+ key on the main keyboard). Only one copy can run at
+    a time: if you start it again it just tells you "StalkerNet is
+    already running".
+
+* The monitor is too big, too small or in the wrong place:
+    StalkerNet fits itself to your screen size automatically (it was made
+    for 4K). Windows display scaling (125%, 150%...) is ignored. To change
+    the size of EVERYTHING (monitor, text, pictures) in one go, set
+    DISPLAY_SCALE at the top of settings.txt, for example
+    DISPLAY_SCALE = 0.8 (20% smaller). Send overlay_debug.txt if it is
+    still wrong - its first lines show your screen size and the scale it used.
 
 * It does not close, or you want to stop it:
     double-click  close_stalkernet.bat
