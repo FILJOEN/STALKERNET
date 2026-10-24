@@ -8,3 +8,6 @@ Source code for the STALKERNET cosmetic PDA-style overlay for S.T.A.L.K.E.R. 2 c
 Folder too big to be uploaded to Github.
 Folder consists of multiple folders containing mp3/png/gif/txt/font files.
 https://www.nexusmods.com/stalker2heartofchornobyl/mods/3051?tab=files
+
+
+I made some changes because it was buggy on different resolutions. So I added an auto scale feature and made some small qol/animation changes.
